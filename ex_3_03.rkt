@@ -1,0 +1,20 @@
+#lang racket
+
+(define (make-account balance my-password)
+  (define (withdraw amount)
+    (if (>= balance amount)
+        (begin (set! balance 
+                     (- balance amount))
+               balance)
+        "Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (define (dispatch try-password m)
+    (if (eq? my-password try-password)
+        (cond ((eq? m 'withdraw) withdraw)
+              ((eq? m 'deposit) deposit)
+              (else (error "Unknown request: 
+                 MAKE-ACCOUNT" m)))
+        (error "Incorrect password")))
+  dispatch)
