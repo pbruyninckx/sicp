@@ -119,6 +119,7 @@
   (cond ((number? exp) true)
         ((string? exp)
          true)
+        ((eq? '*unassigned* exp) true)
         (else false)))
 
 (define (variable? exp) (symbol? exp))
@@ -268,7 +269,7 @@
 
 ; Ex 4.6 and 4.8
 (define (let->combination exp)
-  (if (eq? (length exp) 3)
+  (if (pair? (cadr exp))
       (let  ; ordinary let
           ((varexps (cadr exp))
            (body (cddr exp)))
@@ -313,7 +314,10 @@
   (eq? x false))
 
 (define (make-procedure parameters body env)
-  (list 'procedure parameters body env))
+  (list 'procedure
+        parameters
+        (scan-out-defines body)
+        env))
 (define (compound-procedure? p)
   (tagged-list? p 'procedure))
 (define (procedure-parameters p) (cadr p))
@@ -346,7 +350,7 @@
 
 (define (lookup-variable-value var env)
   (define (validate-var var val)
-    (if (eq? var '*unassigned*)
+    (if (eq? val '*unassigned*)
         (error "Unassigned variable" var)
         val))
   (define (env-loop env)
@@ -373,8 +377,8 @@
               (enclosing-environment env)))
             ((eq? var (car vars))
              (set-car! vals val))
-            (else (scan (cdr vals)
-                        (cdr vars)))))
+            (else (scan (cdr vars)
+                        (cdr vals)))))
     (if (eq? env the-empty-environment)
         (error "Unbound variable: SET! " var)
         (let ((frame (first-frame env)))
@@ -415,15 +419,15 @@
          (body (cdr defs-and-body)))
     (if (null? defs)
         proc-body
-        (append
-         (list 'let
-               (map (lambda (var) (list var '*unassigned*))
-                    (map (lambda (def) (definition-variable def)) defs)))
-         (map (lambda (def) (list 'set!
-                                  (definition-variable def)
-                                  (definition-value def)))
-              defs)
-         body))))
+        (list (append
+               (list 'let
+                     (map (lambda (var) (list var '*unassigned*))
+                          (map (lambda (def) (definition-variable def)) defs)))
+               (map (lambda (def) (list 'set!
+                                        (definition-variable def)
+                                        (definition-value def)))
+                    defs)
+               body)))))
 
               
 
