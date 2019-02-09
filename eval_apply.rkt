@@ -345,13 +345,17 @@
 
 
 (define (lookup-variable-value var env)
+  (define (validate-var var val)
+    (if (eq? var '*unassigned*)
+        (error "Unassigned variable" var)
+        val))
   (define (env-loop env)
     (define (scan vars vals)
       (cond ((null? vars)
              (env-loop
               (enclosing-environment env)))
             ((eq? var (car vars))
-             (car vals))
+             (validate-var (car vars) (car vals)))
             (else (scan (cdr vars)
                         (cdr vals)))))
     (if (eq? env the-empty-environment)
@@ -400,6 +404,31 @@
     (define-variable! 'false false initial-env)
     initial-env))
 
+(define (scan-out-defines proc-body)
+  (define (split-defines proc-body ret-defs ret-body)
+    (cond ((null? proc-body) (cons ret-defs ret-body))
+          ((definition? (car proc-body))
+           (split-defines (cdr proc-body) (cons (car proc-body) ret-defs) ret-body))
+          (else (split-defines (cdr proc-body) ret-defs (cons (car proc-body) ret-body)))))
+  (let* ((defs-and-body (split-defines proc-body '() '()))
+         (defs (car defs-and-body))
+         (body (cdr defs-and-body)))
+    (if (null? defs)
+        proc-body
+        (append
+         (list 'let
+               (map (lambda (var) (list var '*unassigned*))
+                    (map (lambda (def) (definition-variable def)) defs)))
+         (map (lambda (def) (list 'set!
+                                  (definition-variable def)
+                                  (definition-value def)))
+              defs)
+         body))))
+
+              
+
+;  (error "NOT IMPLEMENTED"))
+
 (define (primitive-procedure? proc)
   (tagged-list? proc 'primitive))
 
@@ -412,7 +441,9 @@
         (list 'cons cons)
         (list 'null? null?)
         (list '+ +)
-        (list '- -)))
+        (list '- -)
+        (list '* *)
+        (list '= =)))
 
 (define (primitive-procedure-names)
   (map car primitive-procedures))
