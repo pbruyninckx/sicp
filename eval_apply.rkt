@@ -33,7 +33,9 @@
         ((let? exp)
          (eval (let->combination exp) env))
         ((let*? exp)
-         (eval (let*->nested-lets exp)))
+         (eval (let*->nested-lets exp) env))
+        ((letrec? exp)
+         (eval (letrec->let exp) env))
         ((application? exp)
          (metacircular-apply (eval (operator exp) env)
                 (list-of-values
@@ -174,6 +176,7 @@
 
 (define (let? exp) (tagged-list? exp 'let))
 (define (let*? exp) (tagged-list? exp 'let*))
+(define (letrec? exp) (tagged-list? exp 'letrec))
 
 (define (make-if predicate
                  consequent
@@ -429,6 +432,14 @@
                     defs)
                body)))))
 
+(define (letrec->let exp)
+  (let ((varexps (cadr exp))
+        (body (cddr exp)))
+    (append
+     (list 'let
+           (map (lambda (varexp) (list (car varexp) '*unassigned*)) varexps))
+     (map (lambda (varexp) (cons 'set! varexp)) varexps)
+     body)))
 
 (define (primitive-procedure? proc)
   (tagged-list? proc 'primitive))
