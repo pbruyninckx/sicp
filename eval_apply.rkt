@@ -429,9 +429,6 @@
                     defs)
                body)))))
 
-              
-
-;  (error "NOT IMPLEMENTED"))
 
 (define (primitive-procedure? proc)
   (tagged-list? proc 'primitive))
