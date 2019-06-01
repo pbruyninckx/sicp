@@ -24,6 +24,8 @@
           (begin-actions exp)))
         ((cond? exp)
          (analyze (cond->if exp)))
+        ((let? exp)
+         (analyze (let->combination exp)))
         ((application? exp)
          (analyze-application exp))
         (else
@@ -332,28 +334,7 @@
                       (cond-actions first))
                      (expand-clauses rest)))))))
 
-; Ex 4.6 and 4.8
-(define (let->combination exp)
-  (if (pair? (cadr exp))
-      (let  ; ordinary let
-          ((varexps (cadr exp))
-           (body (cddr exp)))
-        (cons
-         (make-lambda
-          (map car varexps)
-          body)
-         (map cadr varexps)))
-      (let ; named let
-          ((var (cadr exp))
-           (bindings (caddr exp))
-           (body (cadddr exp)))
-        ; This DOES NOT WORK -> FIX IT
-        (cons
-         (make-lambda
-          (map car bindings)
-          body)
-         (map cdr bindings)))))
-        
+       
 
 ; Ex 4.7
 (define (let*->nested-lets exp)
@@ -510,6 +491,17 @@
         (list '- -)
         (list '* *)
         (list '= =)))
+
+; Exercise 4.22 - copied from 4.6
+(define (let->combination exp)
+  (let  ; ordinary let
+      ((varexps (cadr exp))
+       (body (cddr exp)))
+    (cons
+     (make-lambda
+      (map car varexps)
+      body)
+     (map cadr varexps))))
 
 (define (primitive-procedure-names)
   (map car primitive-procedures))
