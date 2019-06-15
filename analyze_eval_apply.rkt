@@ -84,10 +84,10 @@
           (cproc env)
           (aproc env)))))
 
-(define (analyze-lambda ecp)
+(define (analyze-lambda exp)
   (let ((vars (lambda-parameters exp))
         (bproc (analyze-sequence
-                (lambda-body exp))))
+                (scan-out-defines (lambda-body exp)))))
     (lambda (env)
       (make-procedure vars bproc env))))
 
@@ -362,7 +362,7 @@
 (define (make-procedure parameters body env)
   (list 'procedure
         parameters
-        (scan-out-defines body)
+        body
         env))
 (define (compound-procedure? p)
   (tagged-list? p 'procedure))
