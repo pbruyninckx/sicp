@@ -91,7 +91,7 @@
     (lambda (env)
       (make-procedure vars bproc env))))
 
-(define (analyze-sequence exps)
+(define (analyze-sequence-orig exps)
   (define (sequentially proc1 proc2)
     (lambda (env) (proc1 env) (proc2 env)))
   (define (loop first-proc rest-procs)
@@ -104,6 +104,19 @@
     (if (null? procs)
         (error "Empty sequence: ANALYZE"))
     (loop (car procs) (cdr procs))))
+
+(define (analyze-sequence exps)
+  (define (execute-sequence procs env)
+    (cond ((null? (cdr procs))
+                  ((car procs) env))
+           (else ((car procs) env)
+                 (execute-sequence
+                  (cdr procs) env))))
+  (let ((procs (map analyze exps)))
+    (if (null? procs)
+        (error "Empty sequence: ANALYZE"))
+    (lambda (env)
+      (execute-sequence procs env))))
 
 (define (analyze-application exp)
   (let ((fproc (analyze (operator exp)))
@@ -490,7 +503,8 @@
         (list '+ +)
         (list '- -)
         (list '* *)
-        (list '= =)))
+        (list '= =)
+        (list '< <)))
 
 ; Exercise 4.22 - copied from 4.6
 (define (let->combination exp)
