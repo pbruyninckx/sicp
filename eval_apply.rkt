@@ -15,6 +15,8 @@
          (eval-definition exp env))
         ((if? exp)
          (eval-if exp env))
+        ((unless? exp)
+         (eval-unless exp env))
         ((lambda? exp)
          (make-procedure
           (lambda-parameters exp)
@@ -75,6 +77,13 @@
   (if (true? (eval (if-predicate exp) env))
       (eval (if-consequent exp) env)
       (eval (if-alternative exp) env)))
+
+; Ex 4.26 - special form unless
+(define (eval-unless exp env)
+  (eval (make-if (unless-condition exp)
+                 (unless-exceptional exp)
+                 (unless-normal exp))
+        env))
 
 (define (eval-sequence exps env)
   (cond ((last-exp? exps)
@@ -173,6 +182,11 @@
   (if (not (null? (cdddr exp)))
       (cadddr exp)
       'false))
+
+(define (unless? exp) (tagged-list? exp 'unless))
+(define (unless-condition exp) (cadr exp))
+(define (unless-normal exp) (caddr exp))
+(define (unless-exceptional exp) (cadddr exp))
 
 (define (let? exp) (tagged-list? exp 'let))
 (define (let*? exp) (tagged-list? exp 'let*))
@@ -455,7 +469,8 @@
         (list '+ +)
         (list '- -)
         (list '* *)
-        (list '= =)))
+        (list '= =)
+        (list '/ /)))
 
 (define (primitive-procedure-names)
   (map car primitive-procedures))
