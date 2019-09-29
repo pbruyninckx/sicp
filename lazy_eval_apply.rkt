@@ -31,7 +31,7 @@
         ((or? exp)
          (eval (or->if exp) env))
         ((cond? exp)
-         (eval (cond->if exp) env))
+         (eval (cond->if exp env) env))
         ((let? exp)
          (eval (let->combination exp) env))
         ((let*? exp)
@@ -39,29 +39,33 @@
         ((letrec? exp)
          (eval (letrec->let exp) env))
         ((application? exp)
-         (metacircular-apply (eval (operator exp) env)
-                (list-of-values
-                 (operands exp)
-                 env)))
+         (metacircular-apply (actual-value (operator exp) env)
+                             (operands exp)
+                             env))
         (else
          (error "Unknown expression type: EVAL " exp))))
 
-(define (metacircular-apply procedure arguments)
+(define (metacircular-apply procedure arguments env)
   (cond ((primitive-procedure? procedure)
          (apply-primitive-procedure
           procedure
-          arguments))
+          (list-of-arg-values
+           arguments
+           env)))
         ((compound-procedure? procedure)
          (eval-sequence
           (procedure-body procedure)
           (extend-environment
            (procedure-parameters
             procedure)
-           arguments
+           (list-of-delayed-args arguments env)
            (procedure-environment
             procedure))))
         (else
          (error "Unknown procedure type: METACIRCULAR-APPLY " procedure))))
+
+(define (actual-value exp env)
+  (force-it (eval exp env)))
 
 (define (list-of-values exps env)
   (if (no-operands? exps)
@@ -71,10 +75,45 @@
              (rest-operands exps)
              env))))
 
+(define (list-of-arg-values exps env)
+  (if (no-operands? exps)
+      '()
+      (cons (actual-value (first-operand exps) env)
+            (list-of-arg-values (rest-operands exps) env))))
+
+(define (list-of-delayed-args exps env)
+  (if (no-operands? exps)
+      '()
+      (cons (delay-it (first-operand exps) env)
+            (list-of-delayed-args (rest-operands exps) env))))
+
+(define (force-it obj)
+  (cond ((thunk? obj)
+         (let ((result
+                (actual-value (thunk-exp obj)
+                              (thunk-env obj))))
+           (set-car! obj 'evaluated-thunk)
+           (set-car! (cdr obj) result)
+           (set-cdr! (cdr obj) '())
+           result))
+        ((evaluated-thunk? obj) (thunk-value obj))
+        (else obj)))
+
+(define (delay-it exp env)
+  (list 'thunk exp env))
+(define (thunk? obj) (tagged-list? obj 'thunk))
+(define (thunk-exp thunk) (cadr thunk))
+(define (thunk-env thunk) (caddr thunk))
+
+(define (evaluated-thunk? obj)
+  (tagged-list? obj 'evaluated-thunk))
+
+(define (thunk-value evaluated-thunk)
+  (cadr evaluated-thunk))
 
 
 (define (eval-if exp env)
-  (if (true? (eval (if-predicate exp) env))
+  (if (true? (actual-value (if-predicate exp) env))
       (eval (if-consequent exp) env)
       (eval (if-alternative exp) env)))
 
@@ -121,8 +160,8 @@
       '()
       (let ((rest-values
              (list-of-values-r2l
-                (rest-operands exps)
-                env)))
+              (rest-operands exps)
+              env)))
         (cons (eval (first-operand exps) env)
               rest-values))))
 
@@ -258,13 +297,13 @@
   (car clause))
 (define (cond-actions clause)
   (cdr clause))
-(define (cond->if exp)
-  (expand-clauses (cond-clauses exp)))
+(define (cond->if exp env)
+  (expand-clauses (cond-clauses exp) env))
 ; Ex 4.5 is integrated
 (define (cond-=>? clause)
   (and (= (length clause) 3)
        (eq? '=> (cadr clause))))
-(define (expand-clauses clauses)
+(define (expand-clauses clauses env)
   (if (null? clauses)
       'false ;no else clause
       (let ((first (car clauses))
@@ -275,10 +314,10 @@
                 (sequence->exp
                  (cond-actions first))
                 (error "ELSE clause isn't last: COND->IF " clauses)))
-          ;((cond-=>? first) ; This works incorrectly if the condition has side-effects
-          ; (make-if (car first)
-          ;          (eval (list (caddr first) (car first)) env)
-          ;          (expand-clauses rest)))
+          ((cond-=>? first) ; This works incorrectly if the condition has side-effects
+           (make-if (car first)
+                    (eval (list (caddr first) (car first)) env)
+                    (expand-clauses rest)))
           (else (make-if (cond-predicate first)
                      (sequence->exp
                       (cond-actions first))
@@ -318,7 +357,7 @@
               (let*->nested-lets (list 'let* (cdr varexps) body))))))
 ; I don't think there's a need to explicitely expand the let.
 ; I should test this later when the whole thing seems to work
-
+;
 ; Ex 4.9
 ; Syntax: (for (i '(1 2 3)) (print i))
 ; translate to:
@@ -470,7 +509,8 @@
         (list '- -)
         (list '* *)
         (list '= =)
-        (list '/ /)))
+        (list '/ /)
+        (list '< <)))
 
 (define (primitive-procedure-names)
   (map car primitive-procedures))
@@ -484,15 +524,15 @@
   (apply-in-underlying-scheme
    (primitive-implementation proc) args))
 
-(define input-prompt ";;; M-eval input:")
-(define output-prompt ";;; M-eval value:")
+(define input-prompt ";;; L-eval input:")
+(define output-prompt ";;; L-eval value:")
 
 (define (driver-loop)
   (prompt-for-input input-prompt)
   (let ((input (read)))
     (let ((output
-           (eval input
-                 the-global-environment)))
+           (actual-value input
+                         the-global-environment)))
       (announce-output output-prompt)
       (user-print output)))
   (driver-loop))
@@ -523,7 +563,7 @@
                    (map op (cdr vals)))))
       the-global-environment)
 
-;(driver-loop)
+(driver-loop)
 
 
 
