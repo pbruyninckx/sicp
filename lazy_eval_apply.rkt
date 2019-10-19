@@ -510,7 +510,9 @@
         (list '* *)
         (list '= =)
         (list '/ /)
-        (list '< <)))
+        (list '< <)
+        (list 'newline newline)
+        (list 'display display)))
 
 (define (primitive-procedure-names)
   (map car primitive-procedures))
